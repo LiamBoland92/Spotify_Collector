@@ -89,5 +89,17 @@ python spotify_collector.py import --playlist "Summer 2026" --start 2026-06-01 -
 
 TLDR: No longer ends in an error message. Wraps up with a full session breakdown with details.
 
+### 1.3: Playlist recheck and final check
+
+- Before each update, the collector checks whether the playlist has changed and re-reads it if so, instead of only reading it at startup.
+  - Songs added from another computer or by hand are no longer added again.
+  - Songs removed from the playlist are added back if you play them again.
+  - Uses the playlist's version number (`snapshot_id`), so an unchanged playlist costs one small request per check instead of a full re-read.
+  - Running on two computers at once is now mostly safe, though running one at a time is still best.
+- Pressing Ctrl+C runs one last check before the wrap-up, so the playlist and stats are complete. Press Ctrl+C again to skip it.
+- Checks are safe to interrupt: nothing is saved unless the playlist update succeeds.
+
+TLDR: You can use multiple computers that will hand off to each other. As long as they don't add songs in the same second, there should be no repeats. The program checks the entire playlists for duplicate songs. In order to stay memory efficient, the computer will only check the folder if and only if it sees that it has been edited since it last took data.
+
 ## Acknowledgements
 This was created while procrastinating studying for physics. Please bear with me on the shitty instructions; I am hoping to improve this sooner rather than later. Claude was used for most of this too, so again, forgive me for my sins.
