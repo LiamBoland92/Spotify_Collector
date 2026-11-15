@@ -1,0 +1,11 @@
+# Spotify login token and progress - never commit these
+spotify_token.json
+spotify_state.json
+
+# Spotify streaming history exports (personal data)
+Streaming_History*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
