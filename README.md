@@ -68,6 +68,8 @@ Fixed a crash on Windows when no --until date was given.
 The start time is saved for each playlist, so repeated --once runs (like Task Scheduler) no longer skip plays from before each run.
 The wait between checks uses the real clock, so time asleep counts and a check happens within about 30 seconds of the laptop waking.
 
+TLDR: PowerShell listens to the computer's time to see how long it's been running to update.
+
 ## 1.2: Artists and wrap-up
 
 Each new song prints with its artists, for example + Disco 2000 - Pulp.
@@ -82,6 +84,8 @@ number of different artists
 peak listening hour
 A new stats command shows the wrap-up anytime, even while the collector is running.
 Stats count every play, including repeats, are saved per playlist, and add up across restarts. They start counting from 1.2.
+
+TLDR: No longer ends in an error message. Wraps up with a full session breakdown with details.
 
 ## Acknowledgements
 This was created while procrastinating studying for physics. Please bear with me on the shitty instructions; I am hoping to improve this sooner rather than later. Claude was used for most of this too, so again, forgive me for my sins.
