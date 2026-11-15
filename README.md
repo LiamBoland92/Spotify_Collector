@@ -50,8 +50,38 @@ python spotify_collector.py import --playlist "Summer 2026" --start 2026-06-01 -
 - 403 creating a playlist - make it in Spotify and use `--playlist-id <id>`.
 - "User not registered" - add yourself under User Management on the dashboard.
 
-## Update 1.1
-It now responds to the computer's time, not how long PowerShell has actually been running
+## 1.0: First version
+
+watch mode checks your Spotify recently played list on a timer and adds new songs to a playlist.
+import mode builds a playlist from a past time window using Spotify’s Extended Streaming History export, skipping plays under 30 seconds.
+It finds your playlist by name, or creates it if you don’t have one, and --playlist-id lets you use a specific playlist instead.
+No duplicate songs by default, including songs you added by hand; --allow-dupes turns that off.
+Songs are added in the order you played them.
+You log in to Spotify through your browser once, and the login renews automatically after that (no client secret needed).
+It uses Spotify’s API endpoints as they work since the February 2026 changes.
+It retries automatically when Spotify limits requests or has server errors.
+Options: --start, --until, --interval and --once.
+
+## 1.1: Fixes
+
+Fixed a crash on Windows when no --until date was given.
+The start time is saved for each playlist, so repeated --once runs (like Task Scheduler) no longer skip plays from before each run.
+The wait between checks uses the real clock, so time asleep counts and a check happens within about 30 seconds of the laptop waking.
+
+## 1.2: Artists and wrap-up
+
+Each new song prints with its artists, for example + Disco 2000 - Pulp.
+Each check line shows how many plays it saw and how many new songs it added.
+Pressing Ctrl+C, or reaching the --until date, shows a wrap-up instead of an error traceback. The wrap-up shows:
+plays and new songs this session
+total plays and how many different songs
+total listening time
+top 3 artists
+most-repeated song
+number of different artists
+peak listening hour
+A new stats command shows the wrap-up anytime, even while the collector is running.
+Stats count every play, including repeats, are saved per playlist, and add up across restarts. They start counting from 1.2.
 
 ## Acknowledgements
 This was created while procrastinating studying for physics. Please bear with me on the shitty instructions; I am hoping to improve this sooner rather than later. Claude was used for most of this too, so again, forgive me for my sins.
