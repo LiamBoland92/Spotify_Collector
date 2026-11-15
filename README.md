@@ -50,5 +50,8 @@ python spotify_collector.py import --playlist "Summer 2026" --start 2026-06-01 -
 - 403 creating a playlist - make it in Spotify and use `--playlist-id <id>`.
 - "User not registered" - add yourself under User Management on the dashboard.
 
+## Update 1.1
+It now responds to the computer's time, not how long PowerShell has actually been running
+
 ## Acknowledgements
 This was created while procrastinating studying for physics. Please bear with me on the shitty instructions; I am hoping to improve this sooner rather than later. Claude was used for most of this too, so again, forgive me for my sins.
