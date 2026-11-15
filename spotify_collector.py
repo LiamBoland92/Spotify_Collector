@@ -173,8 +173,39 @@ def playlist_uris(pid):
 
 
 def add_to_playlist(pid, uris):
+    """Adds tracks and returns the playlist's new snapshot_id (version), if given."""
+    snapshot = None
     for i in range(0, len(uris), 100):                     # API max is 100 per request
-        api("POST", f"/playlists/{pid}/items", json={"uris": uris[i:i + 100]})
+        result = api("POST", f"/playlists/{pid}/items", json={"uris": uris[i:i + 100]})
+        snapshot = (result or {}).get("snapshot_id", snapshot)
+    return snapshot
+
+
+class PlaylistCache:
+    """What's in the playlist, re-read only when its version (snapshot_id) changes,
+    so songs added or removed elsewhere are noticed during a session."""
+
+    def __init__(self, pid):
+        self.pid = pid
+        self.uris = set()
+        self.snapshot = None
+        self.loaded = False
+
+    def refresh(self):
+        try:
+            snap = (api("GET", f"/playlists/{self.pid}",
+                        params={"fields": "snapshot_id"}) or {}).get("snapshot_id")
+        except RuntimeError:
+            snap = None                    # can't tell the version: re-read to be safe
+        if not self.loaded or snap is None or snap != self.snapshot:
+            self.uris = playlist_uris(self.pid)
+            self.snapshot = snap
+            self.loaded = True
+
+    def added(self, uris, new_snapshot):
+        self.uris.update(uris)
+        if new_snapshot:                   # our own add changed the version; no re-read needed
+            self.snapshot = new_snapshot
 
 
 # ---------------------------------------------------------------- utilities
@@ -297,20 +328,21 @@ def poll_once(pid, state, start_ms, end_ms, seen, session):
 
     # Work out what to add without changing anything yet, so an interrupted
     # check leaves the saved state untouched.
+    if seen is not None and plays:
+        seen.refresh()                     # pick up changes made elsewhere since last check
     to_add, batch_seen = [], set()
     for ms, uri, name, artists, duration in plays:
-        if seen is not None and (uri in seen or uri in batch_seen):
+        if seen is not None and (uri in seen.uris or uri in batch_seen):
             continue
         batch_seen.add(uri)
         to_add.append((uri, name, artists))
-    if to_add:
-        add_to_playlist(pid, [uri for uri, _, _ in to_add])
+    new_snapshot = add_to_playlist(pid, [uri for uri, _, _ in to_add]) if to_add else None
 
     # Playlist updated: now record everything.
     for uri, name, artists in to_add:
         print(f"  + {name} - {', '.join(artists)}")
-    if seen is not None:
-        seen.update(batch_seen)
+    if seen is not None and to_add:
+        seen.added(batch_seen, new_snapshot)
     stats = state.setdefault("stats", {}).setdefault(pid, new_stats())
     for ms, uri, name, artists, duration in plays:
         record_play(stats, name, artists, duration, ms)
@@ -333,7 +365,7 @@ def cmd_watch(args):
     starts[pid] = start.isoformat()
     save_state(state)
     end = parse_when(args.until, end_of_day=True) if args.until else datetime(9999, 12, 31, tzinfo=timezone.utc)
-    seen = None if args.allow_dupes else playlist_uris(pid)
+    seen = None if args.allow_dupes else PlaylistCache(pid)
     session = {"plays": 0, "added": 0}
 
     print(f"Collecting plays from {start:%Y-%m-%d %H:%M} "
