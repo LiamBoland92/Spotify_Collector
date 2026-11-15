@@ -15,6 +15,7 @@ Setup:
 Examples:
   python spotify_collector.py watch  --playlist "Fall 2026" --until 2026-12-15
   python spotify_collector.py watch  --playlist "Fall 2026" --once        (for cron)
+  python spotify_collector.py stats  --playlist "Fall 2026"               (wrap-up any time)
   python spotify_collector.py import --playlist "Summer 2026" \
          --start 2026-06-01 --end 2026-08-31 --files "Streaming_History_Audio_*.json"
 
@@ -211,9 +212,69 @@ def resolve_playlist(args):
     return args.playlist_id or find_or_create_playlist(args.playlist)
 
 
+# ---------------------------------------------------------------- stats
+
+def new_stats():
+    return {"plays": 0, "ms": 0, "artists": {}, "songs": {}, "hours": {}}
+
+
+def record_play(stats, name, artists, duration_ms, played_ms):
+    stats["plays"] += 1
+    stats["ms"] += duration_ms
+    for a in artists:
+        stats["artists"][a] = stats["artists"].get(a, 0) + 1
+    song = f"{name} - {', '.join(artists)}"
+    stats["songs"][song] = stats["songs"].get(song, 0) + 1
+    hour = str(datetime.fromtimestamp(played_ms / 1000).hour)
+    stats["hours"][hour] = stats["hours"].get(hour, 0) + 1
+
+
+def fmt_duration(ms):
+    minutes = round(ms / 60000)
+    h, m = divmod(minutes, 60)
+    return f"{h} hr {m} min" if h else f"{m} min"
+
+
+def plays_label(n):
+    return f"{n} play" if n == 1 else f"{n} plays"
+
+
+def print_wrapup(stats, since=None, session=None):
+    print("\n" + "=" * 44)
+    print("  Listening wrap-up")
+    print("=" * 44)
+    if session is not None:
+        print(f"  This session: {session['plays']} play(s), "
+              f"{session['added']} new song(s) added")
+    if not stats or stats["plays"] == 0:
+        print("  No plays recorded for this playlist yet.")
+        print("=" * 44)
+        return
+    if since:
+        print(f"  Since {datetime.fromisoformat(since):%b %d, %Y %I:%M %p}:")
+    print(f"  Songs played:      {stats['plays']} "
+          f"({len(stats['songs'])} different songs)")
+    print(f"  Listening time:    {fmt_duration(stats['ms'])}")
+
+    top_artists = sorted(stats["artists"].items(), key=lambda kv: -kv[1])[:3]
+    print(f"  Top artist:        {top_artists[0][0]} ({plays_label(top_artists[0][1])})")
+    for a, n in top_artists[1:]:
+        print(f"                     {a} ({plays_label(n)})")
+
+    song, n = max(stats["songs"].items(), key=lambda kv: kv[1])
+    if n > 1:
+        print(f"  On repeat:         {song} ({plays_label(n)})")
+    print(f"  Different artists: {len(stats['artists'])}")
+
+    hour = int(max(stats["hours"].items(), key=lambda kv: kv[1])[0])
+    label = datetime(2000, 1, 1, hour).strftime("%I %p").lstrip("0")
+    print(f"  Peak listening:    around {label}")
+    print("=" * 44)
+
+
 # ---------------------------------------------------------------- watch mode
 
-def poll_once(pid, state, start_ms, end_ms, seen):
+def poll_once(pid, state, start_ms, end_ms, seen, session):
     cursors = state.setdefault("cursors", {})
     cursor = max(cursors.get(pid, 0), start_ms)
     data = api("GET", "/me/player/recently-played", params={"limit": 50, "after": cursor})
@@ -228,22 +289,28 @@ def poll_once(pid, state, start_ms, end_ms, seen):
         uri = track.get("uri", "")
         ms = to_ms(parse_iso(it["played_at"]))
         if uri.startswith("spotify:track:") and start_ms <= ms < end_ms:
-            plays.append((ms, uri, track.get("name", "?")))
+            artists = [a["name"] for a in track.get("artists", []) if a.get("name")]
+            plays.append((ms, uri, track.get("name", "?"), artists or ["Unknown artist"],
+                          track.get("duration_ms", 0)))
         cursor = max(cursor, ms)
     plays.sort()                           # oldest first, so the playlist is chronological
 
+    stats = state.setdefault("stats", {}).setdefault(pid, new_stats())
     to_add = []
-    for _, uri, name in plays:
+    for ms, uri, name, artists, duration in plays:
+        record_play(stats, name, artists, duration, ms)
+        session["plays"] += 1
         if seen is not None:
             if uri in seen:
                 continue
             seen.add(uri)
         to_add.append(uri)
-        print(f"  + {name}")
+        print(f"  + {name} - {', '.join(artists)}")
     if to_add:
         add_to_playlist(pid, to_add)
     cursors[pid] = cursor
-    return len(to_add)
+    session["added"] += len(to_add)
+    return len(to_add), len(plays)
 
 
 def cmd_watch(args):
@@ -260,23 +327,36 @@ def cmd_watch(args):
     save_state(state)
     end = parse_when(args.until, end_of_day=True) if args.until else datetime(9999, 12, 31, tzinfo=timezone.utc)
     seen = None if args.allow_dupes else playlist_uris(pid)
+    session = {"plays": 0, "added": 0}
 
     print(f"Collecting plays from {start:%Y-%m-%d %H:%M} "
-          f"until {'stopped' if not args.until else f'{end:%Y-%m-%d %H:%M}'}.")
-    while True:
-        try:
-            n = poll_once(pid, state, to_ms(start), to_ms(end), seen)
-            save_state(state)
-            print(f"[{datetime.now():%H:%M}] added {n} track(s)")
-        except (RuntimeError, requests.RequestException) as e:
-            print(f"[{datetime.now():%H:%M}] error: {e}")
-        if args.once or datetime.now().astimezone() >= end:
-            break
-        # Wait using the real clock in short naps, so time spent asleep still
-        # counts and a check happens soon after the laptop wakes up.
-        next_check = time.time() + args.interval * 60
-        while time.time() < next_check:
-            time.sleep(min(30, max(0, next_check - time.time())))
+          f"until {'stopped' if not args.until else f'{end:%Y-%m-%d %H:%M}'}."
+          + ("" if args.once else " Press Ctrl+C to stop."))
+    try:
+        while True:
+            try:
+                added, played = poll_once(pid, state, to_ms(start), to_ms(end), seen, session)
+                save_state(state)
+                print(f"[{datetime.now():%H:%M}] {played} play(s), added {added} new track(s)")
+            except (RuntimeError, requests.RequestException) as e:
+                print(f"[{datetime.now():%H:%M}] error: {e}")
+            if args.once or datetime.now().astimezone() >= end:
+                break
+            # Wait using the real clock in short naps, so time spent asleep still
+            # counts and a check happens soon after the laptop wakes up.
+            next_check = time.time() + args.interval * 60
+            while time.time() < next_check:
+                time.sleep(min(30, max(0, next_check - time.time())))
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    if not args.once:
+        print_wrapup(state.get("stats", {}).get(pid), starts.get(pid), session)
+
+
+def cmd_stats(args):
+    state = load_state()
+    pid = resolve_playlist(args)
+    print_wrapup(state.get("stats", {}).get(pid), state.get("starts", {}).get(pid))
 
 
 # ---------------------------------------------------------------- import mode
@@ -336,6 +416,10 @@ def main():
     w.add_argument("--interval", type=float, default=20, help="minutes between checks")
     w.add_argument("--once", action="store_true", help="check once and exit (for cron)")
     w.set_defaults(func=cmd_watch)
+
+    st = sub.add_parser("stats", help="show the wrap-up stats for a playlist")
+    common(st)
+    st.set_defaults(func=cmd_stats)
 
     i = sub.add_parser("import", help="load a past window from your streaming history export")
     common(i)
