@@ -272,7 +272,11 @@ def cmd_watch(args):
             print(f"[{datetime.now():%H:%M}] error: {e}")
         if args.once or datetime.now().astimezone() >= end:
             break
-        time.sleep(args.interval * 60)
+        # Wait using the real clock in short naps, so time spent asleep still
+        # counts and a check happens soon after the laptop wakes up.
+        next_check = time.time() + args.interval * 60
+        while time.time() < next_check:
+            time.sleep(min(30, max(0, next_check - time.time())))
 
 
 # ---------------------------------------------------------------- import mode
