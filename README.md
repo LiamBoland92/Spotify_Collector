@@ -62,28 +62,28 @@ python spotify_collector.py import --playlist "Summer 2026" --start 2026-06-01 -
 -It retries automatically when Spotify limits requests or has server errors.
       Options: --start, --until, --interval and --once.
 
-## 1.1: Fixes
+### 1.1: Fixes
 
--Fixed a crash on Windows when no --until date was given.
--The start time is saved for each playlist, so repeated --once runs (like Task Scheduler) no longer skip plays from before each run.
--The wait between checks uses the real clock, so time asleep counts and a check happens within about 30 seconds of the laptop waking.
+- Fixed a crash on Windows when no `--until` date was given.
+- The start time is saved for each playlist, so repeated `--once` runs (like Task Scheduler) no longer skip plays from before each run.
+- The wait between checks uses the real clock, so time asleep counts and a check happens within about 30 seconds of the laptop waking.
 
-TLDR: PowerShell listens to the computer's time to see how long it's been running to update.
+**TL;DR:** The script checks the computer's clock to decide when it's time for the next update, so sleep time counts.
 
-## 1.2: Artists and wrap-up
+### 1.2: Artists and wrap-up
 
-Each new song prints with its artists, for example + Disco 2000 - Pulp.
-Each check line shows how many plays it saw and how many new songs it added.
-Pressing Ctrl+C, or reaching the --until date, shows a wrap-up instead of an error traceback. The wrap-up shows:
-plays and new songs this session
-total plays and how many different songs
-total listening time
-top 3 artists
-most-repeated song
-number of different artists
-peak listening hour
-A new stats command shows the wrap-up anytime, even while the collector is running.
-Stats count every play, including repeats, are saved per playlist, and add up across restarts. They start counting from 1.2.
+- Each new song prints with its artists, for example `+ Disco 2000 - Pulp`.
+- Each check line shows how many plays it saw and how many new songs it added.
+- Pressing Ctrl+C, or reaching the `--until` date, shows a wrap-up instead of an error traceback. The wrap-up shows:
+  - plays and new songs this session
+  - total plays and how many different songs
+  - total listening time
+  - top 3 artists
+  - most-repeated song
+  - number of different artists
+  - peak listening hour
+- A new `stats` command shows the wrap-up anytime, even while the collector is running.
+- Stats count every play, including repeats, are saved per playlist, and add up across restarts. They start counting from 1.2.
 
 TLDR: No longer ends in an error message. Wraps up with a full session breakdown with details.
 
