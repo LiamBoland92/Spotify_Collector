@@ -295,19 +295,26 @@ def poll_once(pid, state, start_ms, end_ms, seen, session):
         cursor = max(cursor, ms)
     plays.sort()                           # oldest first, so the playlist is chronological
 
+    # Work out what to add without changing anything yet, so an interrupted
+    # check leaves the saved state untouched.
+    to_add, batch_seen = [], set()
+    for ms, uri, name, artists, duration in plays:
+        if seen is not None and (uri in seen or uri in batch_seen):
+            continue
+        batch_seen.add(uri)
+        to_add.append((uri, name, artists))
+    if to_add:
+        add_to_playlist(pid, [uri for uri, _, _ in to_add])
+
+    # Playlist updated: now record everything.
+    for uri, name, artists in to_add:
+        print(f"  + {name} - {', '.join(artists)}")
+    if seen is not None:
+        seen.update(batch_seen)
     stats = state.setdefault("stats", {}).setdefault(pid, new_stats())
-    to_add = []
     for ms, uri, name, artists, duration in plays:
         record_play(stats, name, artists, duration, ms)
-        session["plays"] += 1
-        if seen is not None:
-            if uri in seen:
-                continue
-            seen.add(uri)
-        to_add.append(uri)
-        print(f"  + {name} - {', '.join(artists)}")
-    if to_add:
-        add_to_playlist(pid, to_add)
+    session["plays"] += len(plays)
     cursors[pid] = cursor
     session["added"] += len(to_add)
     return len(to_add), len(plays)
@@ -348,7 +355,17 @@ def cmd_watch(args):
             while time.time() < next_check:
                 time.sleep(min(30, max(0, next_check - time.time())))
     except KeyboardInterrupt:
-        print("\nStopped.")
+        if not args.once:
+            print("\nStopping - running a final check first (press Ctrl+C again to skip)...")
+            try:
+                added, played = poll_once(pid, state, to_ms(start), to_ms(end), seen, session)
+                save_state(state)
+                print(f"[{datetime.now():%H:%M}] {played} play(s), added {added} new track(s)")
+            except KeyboardInterrupt:
+                print("Skipped the final check.")
+            except (RuntimeError, requests.RequestException) as e:
+                print(f"Final check failed: {e}")
+        print("Stopped.")
     if not args.once:
         print_wrapup(state.get("stats", {}).get(pid), starts.get(pid), session)
 
