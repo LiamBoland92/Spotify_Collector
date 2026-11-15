@@ -84,6 +84,8 @@ python spotify_collector.py import --playlist "Summer 2026" --start 2026-06-01 -
   - peak listening hour
 - A new `stats` command shows the wrap-up anytime, even while the collector is running.
 - Stats count every play, including repeats, are saved per playlist, and add up across restarts. They start counting from 1.2.
+- Pressing Ctrl+C runs one last check before the wrap-up, so the playlist and stats are complete. Press Ctrl+C again to skip it.
+- Checks are safe to interrupt: nothing is saved unless the playlist update succeeds.
 
 TLDR: No longer ends in an error message. Wraps up with a full session breakdown with details.
 
