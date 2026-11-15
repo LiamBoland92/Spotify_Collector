@@ -52,21 +52,21 @@ python spotify_collector.py import --playlist "Summer 2026" --start 2026-06-01 -
 
 ## 1.0: First version
 
-watch mode checks your Spotify recently played list on a timer and adds new songs to a playlist.
-import mode builds a playlist from a past time window using Spotify’s Extended Streaming History export, skipping plays under 30 seconds.
-It finds your playlist by name, or creates it if you don’t have one, and --playlist-id lets you use a specific playlist instead.
-No duplicate songs by default, including songs you added by hand; --allow-dupes turns that off.
-Songs are added in the order you played them.
-You log in to Spotify through your browser once, and the login renews automatically after that (no client secret needed).
-It uses Spotify’s API endpoints as they work since the February 2026 changes.
-It retries automatically when Spotify limits requests or has server errors.
-Options: --start, --until, --interval and --once.
+- Watch mode checks your Spotify recently played list on a timer and adds new songs to a playlist.
+- Import mode builds a playlist from a past time window using Spotify’s Extended Streaming History export, skipping plays under 30 seconds.
+   - It finds your playlist by name, or creates it if you don’t have one, and --playlist-id lets you use a    specific playlist instead.
+-No duplicate songs by default, including songs you added by hand; --allow-dupes turns that off.
+-Songs are added in the order you played them.
+-You log in to Spotify through your browser once, and the login renews automatically after that (no client secret needed).
+-It uses Spotify’s API endpoints as they work since the February 2026 changes.
+-It retries automatically when Spotify limits requests or has server errors.
+      Options: --start, --until, --interval and --once.
 
 ## 1.1: Fixes
 
-Fixed a crash on Windows when no --until date was given.
-The start time is saved for each playlist, so repeated --once runs (like Task Scheduler) no longer skip plays from before each run.
-The wait between checks uses the real clock, so time asleep counts and a check happens within about 30 seconds of the laptop waking.
+-Fixed a crash on Windows when no --until date was given.
+-The start time is saved for each playlist, so repeated --once runs (like Task Scheduler) no longer skip plays from before each run.
+-The wait between checks uses the real clock, so time asleep counts and a check happens within about 30 seconds of the laptop waking.
 
 TLDR: PowerShell listens to the computer's time to see how long it's been running to update.
 
