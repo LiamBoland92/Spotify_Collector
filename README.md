@@ -112,7 +112,7 @@ TLDR: You can use multiple computers that will hand off to each other. As long a
 
 **TL;DR:** The Pi is a tiny always-on computer that runs the collector by itself, so nothing gets missed while your laptop is asleep.
 
-### 2.0 Setup: Flashing the SD card
+### 2.1 Setup: Flashing the SD card
 
 - Use Raspberry Pi Imager with Raspberry Pi OS (64-bit).
 - In Customisation, set a hostname, username and password, and enable SSH and Raspberry Pi Connect.
@@ -121,7 +121,7 @@ TLDR: You can use multiple computers that will hand off to each other. As long a
   - Turn on Allow Others to Join and Maximize Compatibility, and keep the Personal Hotspot screen open while the Pi boots.
 - Don't unplug the Pi during its first boot (up to 5 minutes). Interrupting it can break the setup, and the fix is reflashing the card.
 
-### 2.0 Setup: Connecting
+### 2.2 Setup: Connecting
 
 - SSH in from a computer on the same hotspot: `ssh USERNAME@HOSTNAME.local`.
   - If the name isn't found, run `arp -a` and connect by IP instead (`172.20.10.X` on an iPhone hotspot).
@@ -129,7 +129,7 @@ TLDR: You can use multiple computers that will hand off to each other. As long a
 - Update the Pi: `sudo apt update && sudo apt full-upgrade -y`, then `sudo reboot`.
 - Raspberry Pi Connect (connect.raspberrypi.com) gives a remote terminal from any browser, even on networks that block SSH between devices. Check it with `rpi-connect status` before leaving the hotspot.
 
-### 2.0 Setup: Wi-Fi
+### 2.3 Setup: Wi-Fi
 
 - Add networks with `nmcli`. The Pi saves them all and joins whichever is in range, preferring higher `connection.autoconnect-priority`.
 - Home Wi-Fi: `sudo nmcli connection add type wifi con-name Home ifname wlan0 ssid "NAME" wifi-sec.key-mgmt wpa-psk wifi-sec.psk 'PASSWORD' connection.autoconnect-priority 20`
@@ -139,7 +139,7 @@ TLDR: You can use multiple computers that will hand off to each other. As long a
 - Put passwords in single quotes so `$` and `!` aren't misread, and start the command with a space so it isn't saved in your command history.
 - If the Pi can't get online, turn on your phone hotspot. It falls back to it so you can get back in.
 
-### 2.0 Setup: Installing the collector
+### 2.4 Setup: Installing the collector
 
 - Clone into a lowercase folder (Linux folder names are case-sensitive): `git clone https://github.com/LiamBoland92/Spotify_Collector.git Spotify_collector`
 - Install the library with `sudo apt install -y python3-requests` (Raspberry Pi OS blocks system-wide `pip install`).
@@ -151,7 +151,7 @@ TLDR: You can use multiple computers that will hand off to each other. As long a
 - Never share the token. If it leaks, remove the app's access at spotify.com/account (Manage apps) and log in again for a new one.
 - After copying, stop the collector on your other computers so they don't share one token.
 
-### 2.0 Setup: Running the service
+### 2.5 Setup: Running the service
 
 - Copy the edited template to `/etc/systemd/system/spotify-collector.service`, then run each command on its own line:
   - `sudo systemctl daemon-reload`
