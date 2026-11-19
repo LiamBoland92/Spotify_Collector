@@ -101,5 +101,67 @@ TLDR: No longer ends in an error message. Wraps up with a full session breakdown
 
 TLDR: You can use multiple computers that will hand off to each other. As long as they don't add songs in the same second, there should be no repeats. The program checks the entire playlists for duplicate songs. In order to stay memory efficient, the computer will only check the folder if and only if it sees that it has been edited since it last took data.
 
+## 2.0: Raspberry Pi deployment
+
+- The collector now runs 24/7 on a Raspberry Pi as a background service, so it no longer needs a computer left on or a PowerShell window open.
+  - It starts automatically when the Pi boots and restarts itself a minute after a crash.
+  - The Pi doesn't need Spotify installed. It reads your account's listening history, so it picks up plays from your phone, laptop, or any other device.
+- Tested on a Raspberry Pi 3 Model B+ (1 GB) running 64-bit Raspberry Pi OS. Any Pi with Wi-Fi works.
+- New `spotify-collector.service` file in the repo: a template for the Linux service. Fill in your username, Client ID, and playlist name before installing it.
+- Stopping the service (`sudo systemctl stop spotify-collector`) still runs the final check and wrap-up, the same as pressing Ctrl+C.
+
+**TL;DR:** The Pi is a tiny always-on computer that runs the collector by itself, so nothing gets missed while your laptop is asleep.
+
+### 2.0 Setup: Flashing the SD card
+
+- Use Raspberry Pi Imager with Raspberry Pi OS (64-bit).
+- In Customisation, set a hostname, username and password, and enable SSH and Raspberry Pi Connect.
+- For Wi-Fi, enter your phone hotspot, not school Wi-Fi. Imager only supports networks with a single password, so eduroam is added later.
+  - iPhone hotspot names use a curly apostrophe (’) that won't match a typed one, so rename the phone to something simple like `LiamiPhone`.
+  - Turn on Allow Others to Join and Maximize Compatibility, and keep the Personal Hotspot screen open while the Pi boots.
+- Don't unplug the Pi during its first boot (up to 5 minutes). Interrupting it can break the setup, and the fix is reflashing the card.
+
+### 2.0 Setup: Connecting
+
+- SSH in from a computer on the same hotspot: `ssh USERNAME@HOSTNAME.local`.
+  - If the name isn't found, run `arp -a` and connect by IP instead (`172.20.10.X` on an iPhone hotspot).
+  - "Connection refused" means the first boot is still finishing.
+- Update the Pi: `sudo apt update && sudo apt full-upgrade -y`, then `sudo reboot`.
+- Raspberry Pi Connect (connect.raspberrypi.com) gives a remote terminal from any browser, even on networks that block SSH between devices. Check it with `rpi-connect status` before leaving the hotspot.
+
+### 2.0 Setup: Wi-Fi
+
+- Add networks with `nmcli`. The Pi saves them all and joins whichever is in range, preferring higher `connection.autoconnect-priority`.
+- Home Wi-Fi: `sudo nmcli connection add type wifi con-name Home ifname wlan0 ssid "NAME" wifi-sec.key-mgmt wpa-psk wifi-sec.psk 'PASSWORD' connection.autoconnect-priority 20`
+- Northeastern: NURes-device is preferred (register the MAC from `cat /sys/class/net/wlan0/address`), but it isn't available in every building. eduroam works everywhere:
+  - `sudo nmcli connection add type wifi con-name eduroam ifname wlan0 ssid eduroam wifi-sec.key-mgmt wpa-eap 802-1x.eap peap 802-1x.phase2-auth mschapv2 802-1x.identity "USERNAME@northeastern.edu" 802-1x.password 'PASSWORD' connection.autoconnect-priority 10`
+  - eduroam stores your school password on the Pi. Update it after a password change with `sudo nmcli connection modify eduroam 802-1x.password 'NEW-PASSWORD'`.
+- Put passwords in single quotes so `$` and `!` aren't misread, and start the command with a space so it isn't saved in your command history.
+- If the Pi can't get online, turn on your phone hotspot. It falls back to it so you can get back in.
+
+### 2.0 Setup: Installing the collector
+
+- Clone into a lowercase folder (Linux folder names are case-sensitive): `git clone https://github.com/LiamBoland92/Spotify_Collector.git Spotify_collector`
+- Install the library with `sudo apt install -y python3-requests` (Raspberry Pi OS blocks system-wide `pip install`).
+- Copy `spotify_token.json` from a computer where the collector already works, since the Pi has no browser for the login.
+  - On Windows: `Get-Content spotify_token.json | Set-Clipboard`
+  - On the Pi, run `bind 'set enable-bracketed-paste off'`, then `cat > ~/Spotify_collector/spotify_token.json`, paste, press Enter, then Ctrl+D.
+  - Check it with `python3 -m json.tool ~/Spotify_collector/spotify_token.json > /dev/null && echo OK`.
+  - The `bind` line stops the terminal from saving invisible paste markers into the file (a stray `~` is the giveaway).
+- Never share the token. If it leaks, remove the app's access at spotify.com/account (Manage apps) and log in again for a new one.
+- After copying, stop the collector on your other computers so they don't share one token.
+
+### 2.0 Setup: Running the service
+
+- Copy the edited template to `/etc/systemd/system/spotify-collector.service`, then run each command on its own line:
+  - `sudo systemctl daemon-reload`
+  - `sudo systemctl enable --now spotify-collector`
+- Check it: `systemctl status spotify-collector` should say **active (running)**.
+- Recent output: `journalctl -u spotify-collector -n 20`. Live output: `journalctl -u spotify-collector -f`.
+- Stats: `SPOTIFY_CLIENT_ID=YOUR_CLIENT_ID python3 spotify_collector.py stats --playlist "Fall 2026"` (the Client ID is only set inside the service, so pass it here).
+- Switch playlists: `sudo sed -i 's/--playlist "Old"/--playlist "New"/' /etc/systemd/system/spotify-collector.service`, then `sudo systemctl daemon-reload` and `sudo systemctl restart spotify-collector`.
+- Update the code: `cd ~/Spotify_collector && git pull && sudo systemctl restart spotify-collector`.
+- Shut down before unplugging: `sudo shutdown now`.
+
 ## Acknowledgements
 This was created while procrastinating studying for physics. Please bear with me on the shitty instructions; I am hoping to improve this sooner rather than later. Claude was used for most of this too, so again, forgive me for my sins.
